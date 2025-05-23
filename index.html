@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>حاسبة تمويل مايلو</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap');
+        
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f8fafc;
+        }
+        
+        .logo {
+            width: 120px;
+            height: auto;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        }
+        
+        .installment-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .installment-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .admin-panel {
+            background-color: #1e293b;
+        }
+        
+        .password-toggle {
+            cursor: pointer;
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #fff;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 16px;
+            border-radius: 4px;
+            z-index: 1000;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+        
+        @keyframes fadein {
+            from {bottom: 0; opacity: 0;}
+            to {bottom: 20px; opacity: 1;}
+        }
+        
+        @keyframes fadeout {
+            from {bottom: 20px; opacity: 1;}
+            to {bottom: 0; opacity: 0;}
+        }
+        
+        .offer-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 1;
+        }
+        
+        .interest-offer {
+            background-color: #ef4444;
+        }
+        
+        .fee-offer {
+            background-color: #10b981;
+        }
+        
+        .both-offer {
+            background: linear-gradient(135deg, #ef4444 0%, #10b981 100%);
+        }
+        
+        .zero-fee-offer {
+            background-color: #8b5cf6;
+        }
+        
+        .offer-card {
+            position: relative;
+            border: 1px solid #e5e7eb;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .offer-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Tooltip styling */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            right: 50%;
+            transform: translateX(50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+        }
+        
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Responsive fixes */
+        @media (max-width: 640px) {
+            .logo {
+                width: 90px;
+            }
+            
+            .installment-card, .offer-card {
+                margin-bottom: 15px;
+            }
+            
+            .results-container, .offers-container {
+                grid-template-columns: 1fr !important;
+            }
+            
+            .admin-dashboard-grid {
+                grid-template-columns: 1fr !important;
+            }
+            
+            .tooltip .tooltip-text {
+                width: 150px;
+                font-size: 10px;
+            }
+        }
+        
+        /* Animation for calculator */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 1.5s infinite;
+        }
+        
+        /* Confetti effect */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            opacity: 0;
+            z-index: 9999;
+            animation: confetti-fall 5s linear forwards;
+        }
+        
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Welcome Page -->
+    <div id="welcome-page" class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="gradient-bg text-white py-4 px-6 shadow-md">
+            <div class="container mx-auto flex justify-between items-center">
+                <img src="https://cdn.prod.website-files.com/672c9aa30d513a6484b8e56e/673089bfa9e91179ff138f56_Mylo%20logo.svg" alt="Mylo Logo" class="logo">
+                <button id="admin-btn" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition">
+                    لوحة التحكم
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow py-12 px-4">
+            <div class="container mx-auto">
+                <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8 mx-auto mb-12">
+                    <div class="flex items-center justify-center mb-6">
+                        <i class="fas fa-calculator text-3xl text-blue-500 mr-3"></i>
+                        <h1 class="text-2xl font-bold text-gray-800">حاسبة التمويل الاستهلاكي</h1>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">المبلغ المطلوب (جنيه)</label>
+                            <div class="relative">
+                                <input type="number" id="amount" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="أدخل المبلغ" value="50000">
+                                <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">ج.م</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="down-payment" class="block text-sm font-medium text-gray-700 mb-1">المقدم (جنيه)</label>
+                            <div class="relative">
+                                <input type="number" id="down-payment" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="أدخل المقدم" value="5000">
+                                <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">ج.م</span>
+                            </div>
+                        </div>
+                        
+                        <button id="calculate-btn" class="w-full gradient-bg text-white py-3 rounded-lg font-medium hover:opacity-90 transition mt-6 flex items-center justify-center pulse-animation">
+                            <i class="fas fa-calculator ml-2"></i>
+                            احسب الأقساط
+                        </button>
+                    </div>
+                </div>
+                                
+                <!-- Current Offers Section -->
+                <div class="bg-white rounded-xl shadow-lg p-6 max-w-4xl mx-auto">
+                    <div class="flex items-center justify-center mb-6">
+                        <i class="fas fa-tags text-2xl text-blue-500 mr-3"></i>
+                        <h2 class="text-xl font-bold text-gray-800">العروض الحالية</h2>
+                    </div>
+                    <p class="text-gray-600 text-center mb-6">اختر من بين أفضل العروض المتاحة لدينا بأسعار تنافسية</p>
+                    
+                    <div id="offers-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Offers will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-100 py-8 px-6">
+            <div class="container mx-auto text-center">
+                <img src="https://cdn.prod.website-files.com/672c9aa30d513a6484b8e56e/673089bfa9e91179ff138f56_Mylo%20logo.svg" alt="Mylo Logo" class="logo mx-auto mb-4">
+                <p class="text-gray-600">حلول تمويلية ذكية تناسب احتياجاتك</p>
+                <div class="border-t border-gray-200 mt-6 pt-6 text-center text-gray-600 text-sm">
+                    <p>© 2023 مايلو. جميع الحقوق محفوظة.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Results Page -->
+    <div id="results-page" class="min-h-screen flex flex-col hidden">
+        <!-- Header -->
+        <header class="gradient-bg text-white py-4 px-6 shadow-md">
+            <div class="container mx-auto flex justify-between items-center">
+                <img src="https://cdn.prod.website-files.com/672c9aa30d513a6484b8e56e/673089bfa9e91179ff138f56_Mylo%20logo.svg" alt="Mylo Logo" class="logo">
+                <button id="back-btn" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition">
+                    رجوع
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow py-12 px-4">
+            <div class="container mx-auto">
+                <div class="text-center mb-8">
+                    <h1 class="text-2xl font-bold text-gray-800">تفاصيل التمويل</h1>
+                    <p class="text-gray-600 mt-2">اختر المدة المناسبة لك من الخيارات المتاحة</p>
+                </div>
+                
+                <div id="results-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Installment cards will be added here by JavaScript -->
+                </div>
+                
+                <div class="mt-8 bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">ملخص التمويل</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">المبلغ المطلوب</p>
+                            <p id="summary-amount" class="text-lg font-bold text-gray-800">0 جنيه</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">المقدم</p>
+                            <p id="summary-down" class="text-lg font-bold text-gray-800">0 جنيه</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">المبلغ الممول</p>
+                            <p id="summary-financed" class="text-lg font-bold text-gray-800">0 جنيه</p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <button id="apply-now-btn" class="w-full gradient-bg text-white py-3 rounded-lg font-medium hover:opacity-90 transition flex items-center justify-center">
+                            <i class="fas fa-paper-plane ml-2"></i>
+                            تقديم طلب التمويل الآن
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Comparison Section -->
+                <div class="mt-8 bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">مقارنة بين خيارات التمويل</h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدة</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">قيمة القسط</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجمالي الفائدة</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المصاريف الإدارية</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجمالي التكلفة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparison-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Comparison rows will be added here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-100 py-6 px-6">
+            <div class="container mx-auto text-center text-gray-600 text-sm">
+                <p>© 2023 مايلو. جميع الحقوق محفوظة.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Admin Page -->
+    <div id="admin-page" class="min-h-screen flex flex-col hidden">
+        <!-- Header -->
+        <header class="admin-panel text-white py-4 px-6 shadow-md">
+            <div class="container mx-auto flex justify-between items-center">
+                <img src="https://cdn.prod.website-files.com/672c9aa30d513a6484b8e56e/673089bfa9e91179ff138f56_Mylo%20logo.svg" alt="Mylo Logo" class="logo">
+                <button id="logout-btn" class="bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition">
+                    تسجيل الخروج
+                </button>
+            </div>
+        </header>
+
+        <!-- Login Form -->
+        <div id="login-form" class="flex-grow flex items-center justify-center py-12 px-4">
+            <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
+                <div class="flex items-center justify-center mb-6">
+                    <i class="fas fa-lock text-2xl text-blue-500 mr-3"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">تسجيل الدخول</h1>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="admin-username" class="block text-sm font-medium text-gray-700 mb-1">اسم المستخدم</label>
+                        <input type="text" id="admin-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="أدخل اسم المستخدم">
+                    </div>
+                    
+                    <div class="relative">
+                        <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
+                        <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10" placeholder="أدخل كلمة المرور">
+                        <span class="password-toggle" onclick="togglePassword('admin-password')">
+                            <i class="far fa-eye"></i>
+                        </span>
+                    </div>
+                    
+                    <button id="login-btn" class="w-full gradient-bg text-white py-3 rounded-lg font-medium hover:opacity-90 transition mt-6 flex items-center justify-center">
+                        <i class="fas fa-sign-in-alt ml-2"></i>
+                        تسجيل الدخول
+                    </button>
+                    
+                    <p id="login-error" class="text-red-500 text-sm text-center mt-2 hidden">اسم المستخدم أو كلمة المرور غير صحيحة</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="admin-dashboard" class="flex-grow py-12 px-4 hidden">
+            <div class="container mx-auto">
+                <div class="flex items-center justify-center mb-8">
+                    <i class="fas fa-tachometer-alt text-2xl text-blue-500 mr-3"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">لوحة تحكم مايلو</h1>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">إعدادات التمويل</h2>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدة (شهر)</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نسبة الفائدة (%)</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نسبة المصاريف (%)</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">متاح</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">نوع العرض</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rates-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Rates will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <button id="save-settings" class="w-full gradient-bg text-white py-3 rounded-lg font-medium hover:opacity-90 transition mt-8 flex items-center justify-center">
+                        <i class="fas fa-save ml-2"></i>
+                        حفظ الإعدادات
+                    </button>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">إعدادات الدخول</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label for="new-username" class="block text-sm font-medium text-gray-700 mb-1">اسم المستخدم الجديد</label>
+                            <input type="text" id="new-username" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <div class="relative">
+                            <label for="new-password" class="block text-sm font-medium text-gray-700 mb-1">كلمة المرور الجديدة</label>
+                            <input type="password" id="new-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10">
+                            <span class="password-toggle" onclick="togglePassword('new-password')">
+                                <i class="far fa-eye"></i>
+                            </span>
+                        </div>
+                        
+                        <div class="relative">
+                            <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-1">تأكيد كلمة المرور</label>
+                            <input type="password" id="confirm-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-10">
+                            <span class="password-toggle" onclick="togglePassword('confirm-password')">
+                                <i class="far fa-eye"></i>
+                            </span>
+                        </div>
+                        
+                        <div>
+                            <label for="admin-email" class="block text-sm font-medium text-gray-700 mb-1">البريد الإلكتروني</label>
+                            <input type="email" id="admin-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value="tarek.mahmoud1022005@gmail.com">
+                        </div>
+                        
+                        <button id="update-credentials" class="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition mt-4 flex items-center justify-center">
+                            <i class="fas fa-user-edit ml-2"></i>
+                            تحديث بيانات الدخول
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md p-6 admin-dashboard-grid">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">الإعدادات الحالية</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">عدد العروض المتاحة</p>
+                            <p id="current-offers-count" class="text-lg font-bold text-gray-800">0</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">أقل نسبة فائدة</p>
+                            <p id="min-interest" class="text-lg font-bold text-gray-800">0%</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-gray-600 text-sm">آخر تحديث</p>
+                            <p id="last-updated" class="text-lg font-bold text-gray-800">-</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Statistics Section -->
+                <div class="bg-white rounded-xl shadow-md p-6 mt-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">إحصائيات التمويل</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                            <p class="text-gray-600 text-sm">إجمالي طلبات التمويل</p>
+                            <p id="total-applications" class="text-2xl font-bold text-gray-800">1,245</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+                            <p class="text-gray-600 text-sm">طلبات تمت الموافقة عليها</p>
+                            <p id="approved-applications" class="text-2xl font-bold text-gray-800">892</p>
+                        </div>
+                        <div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-500">
+                            <p class="text-gray-600 text-sm">طلبات قيد المراجعة</p>
+                            <p id="pending-applications" class="text-2xl font-bold text-gray-800">153</p>
+                        </div>
+                        <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+                            <p class="text-gray-600 text-sm">طلبات مرفوضة</p>
+                            <p id="rejected-applications" class="text-2xl font-bold text-gray-800">200</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="admin-panel py-6 px-6">
+            <div class="container mx-auto text-center text-gray-300 text-sm">
+                <p>© 2023 مايلو. لوحة التحكم الداخلية.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC50irUvRJ-kRNj-OSZLDI97HVSSnNwzaE",
+            authDomain: "mylo-88679.firebaseapp.com",
+            projectId: "mylo-88679",
+            storageBucket: "mylo-88679.firebasestorage.app",
+            messagingSenderId: "258971720458",
+            appId: "1:258971720458:web:eb01de60f53b0cd763f8f3",
+            measurementId: "G-740KQWHSRL"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const analytics = firebase.analytics();
+        const database = firebase.database();
+
+        // Current settings (will be loaded from Firebase)
+        let currentSettings = {
+            rates: {
+                2: { interest: 6, fee: 0, available: true, offerType: "zero-fee" },
+                3: { interest: 10, fee: 0, available: true, offerType: "zero-fee" },
+                6: { interest: 19, fee: 0, available: true, offerType: "zero-fee" },
+                9: { interest: 22.8, fee: 2.5, available: true, offerType: "both" },
+                12: { interest: 30, fee: 3.5, available: true, offerType: "interest" },
+                15: { interest: 40, fee: 2.5, available: true, offerType: "both" },
+                18: { interest: 52, fee: 0, available: true, offerType: "both" },
+                24: { interest: 44, fee: 7.5, available: true, offerType: "interest" },
+                36: { interest: 108, fee: 0, available: true, offerType: "both" },
+                48: { interest: 200, fee: 5, available: true, offerType: "none" }
+            },
+            lastUpdated: new Date().toLocaleString()
+        };
+
+        // Admin credentials (stored in Firebase)
+        let adminCredentials = {
+            username: "admin",
+            password: "mylo1234",
+            email: "tarek.mahmoud1022005@gmail.com"
+        };
+
+        // DOM Elements
+        const welcomePage = document.getElementById('welcome-page');
+        const resultsPage = document.getElementById('results-page');
+        const adminPage = document.getElementById('admin-page');
+        const adminDashboard = document.getElementById('admin-dashboard');
+        const loginForm = document.getElementById('login-form');
+        
+        // Buttons
+        const calculateBtn = document.getElementById('calculate-btn');
+        const backBtn = document.getElementById('back-btn');
+        const adminBtn = document.getElementById('admin-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const loginBtn = document.getElementById('login-btn');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const updateCredentialsBtn = document.getElementById('update-credentials');
+        const applyNowBtn = document.getElementById('apply-now-btn');
+        
+        // Inputs
+        const amountInput = document.getElementById('amount');
+        const downPaymentInput = document.getElementById('down-payment');
+        const adminUsername = document.getElementById('admin-username');
+        const adminPassword = document.getElementById('admin-password');
+        const newUsername = document.getElementById('new-username');
+        const newPassword = document.getElementById('new-password');
+        const confirmPassword = document.getElementById('confirm-password');
+        const adminEmail = document.getElementById('admin-email');
+        
+        // Display elements
+        const resultsContainer = document.getElementById('results-container');
+        const offersContainer = document.getElementById('offers-container');
+        const ratesTableBody = document.getElementById('rates-table-body');
+        const comparisonTableBody = document.getElementById('comparison-table-body');
+        const summaryAmount = document.getElementById('summary-amount');
+        const summaryDown = document.getElementById('summary-down');
+        const summaryFinanced = document.getElementById('summary-financed');
+        const currentOffersCount = document.getElementById('current-offers-count');
+        const minInterest = document.getElementById('min-interest');
+        const lastUpdated = document.getElementById('last-updated');
+        const loginError = document.getElementById('login-error');
+        const totalApplications = document.getElementById('total-applications');
+        const approvedApplications = document.getElementById('approved-applications');
+        const pendingApplications = document.getElementById('pending-applications');
+        const rejectedApplications = document.getElementById('rejected-applications');
+        
+        // Initialize the app with real Firebase data
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                // Load settings from Firebase
+                const settingsSnapshot = await database.ref('settings').get();
+                const credentialsSnapshot = await database.ref('credentials').get();
+                
+                if (settingsSnapshot.val()) {
+                    currentSettings = settingsSnapshot.val();
+                } else {
+                    // If no settings exist, save the default settings
+                    await database.ref('settings').set(currentSettings);
+                }
+                
+                if (credentialsSnapshot.val()) {
+                    adminCredentials = credentialsSnapshot.val();
+                } else {
+                    // If no credentials exist, save the default credentials
+                    await database.ref('credentials').set(adminCredentials);
+                }
+                
+                // Update displays
+                updateAdminDashboard();
+                displayCurrentOffers();
+                
+                // Set email field
+                adminEmail.value = adminCredentials.email;
+            } catch (error) {
+                console.error("Error loading data:", error);
+                showToast("حدث خطأ في تحميل البيانات");
+            }
+            
+            // Event listeners
+            calculateBtn.addEventListener('click', calculateInstallments);
+            backBtn.addEventListener('click', goBackToWelcome);
+            adminBtn.addEventListener('click', showAdminPage);
+            logoutBtn.addEventListener('click', logout);
+            loginBtn.addEventListener('click', login);
+            saveSettingsBtn.addEventListener('click', saveSettings);
+            updateCredentialsBtn.addEventListener('click', updateCredentials);
+            applyNowBtn.addEventListener('click', applyForLoan);
+        });
+
+        // Calculate installments
+        function calculateInstallments() {
+            const amount = parseFloat(amountInput.value);
+            const downPayment = parseFloat(downPaymentInput.value) || 0;
+            
+            if (!amount || amount <= 0) {
+                alert("الرجاء إدخال مبلغ صحيح");
+                return;
+            }
+            
+            if (downPayment >= amount) {
+                alert("المقدم يجب أن يكون أقل من المبلغ الكلي");
+                return;
+            }
+            
+            const financedAmount = amount - downPayment;
+            
+            // Update summary
+            summaryAmount.textContent = amount.toLocaleString() + " جنيه";
+            summaryDown.textContent = downPayment.toLocaleString() + " جنيه";
+            summaryFinanced.textContent = financedAmount.toLocaleString() + " جنيه";
+            
+            // Clear previous results
+            resultsContainer.innerHTML = '';
+            comparisonTableBody.innerHTML = '';
+            
+            // Calculate for each available month
+            for (const [months, rate] of Object.entries(currentSettings.rates)) {
+                if (!rate.available) continue;
+                
+                const monthsInt = parseInt(months);
+                
+                // Calculate total interest amount (fixed calculation)
+                const totalInterest = financedAmount * (rate.interest / 100);
+                
+                // Calculate total amount with interest
+                const totalAmountWithInterest = financedAmount + totalInterest;
+                
+                // Calculate monthly installment (total amount divided by months)
+                const installmentAmount = totalAmountWithInterest / monthsInt;
+                
+                // Calculate admin fee (0 if zero-fee offer)
+                const adminFee = rate.offerType === "zero-fee" ? 0 : financedAmount * (rate.fee / 100);
+                
+                // Total cost (installment * months + down payment)
+                const totalCost = (installmentAmount * monthsInt);
+                
+                // Create card
+                const card = document.createElement('div');
+                card.className = 'bg-white p-6 rounded-lg shadow-md installment-card relative';
+                
+                // Add badge for special offers (now on the left side)
+                if (rate.offerType !== "none") {
+                    let badgeClass = "";
+                    let badgeText = "";
+                    
+                    if (rate.offerType === "interest") {
+                        badgeClass = "interest-offer";
+                        badgeText = "خصم علي الفوائد";
+                    } else if (rate.offerType === "fee") {
+                        badgeClass = "fee-offer";
+                        badgeText = "خصم على المصاريف";
+                    } else if (rate.offerType === "both") {
+                        badgeClass = "both-offer";
+                        badgeText = "خصم شامل";
+                    } else if (rate.offerType === "zero-fee") {
+                        badgeClass = "zero-fee-offer";
+                        badgeText = "بدون مصاريف إدارية";
+                    }
+                    
+                    card.innerHTML = `<div class="offer-badge ${badgeClass}">${badgeText}</div>`;
+                }
+                
+                card.innerHTML += `
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">${months} شهر</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">نسبة الفائدة</span>
+                            <span class="font-medium">${rate.interest}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">قيمة القسط</span>
+                            <span class="font-medium">${Math.round(installmentAmount).toLocaleString()} جنيه</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">المصاريف الإدارية</span>
+                            <span class="font-medium">${Math.round(adminFee).toLocaleString()} جنيه</span>
+                        </div>
+                        <div class="border-t border-gray-200 my-2"></div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">المبلغ الإجمالي</span>
+                            <span class="font-bold text-blue-600">${Math.round(totalCost).toLocaleString()} جنيه</span>
+                        </div>
+                    </div>
+                `;
+                
+                resultsContainer.appendChild(card);
+                
+                // Add to comparison table
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${months} شهر</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${Math.round(installmentAmount).toLocaleString()} جنيه</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${Math.round(totalInterest).toLocaleString()} جنيه</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${Math.round(adminFee).toLocaleString()} جنيه</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${Math.round(totalCost).toLocaleString()} جنيه</td>
+                `;
+                comparisonTableBody.appendChild(row);
+            }
+            
+            // Show results page
+            welcomePage.classList.add('hidden');
+            resultsPage.classList.remove('hidden');
+            
+            // Create confetti effect
+            createConfetti();
+        }
+        
+        // Create confetti effect
+        function createConfetti() {
+            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#6366f1'];
+            
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.width = Math.random() * 10 + 5 + 'px';
+                confetti.style.height = Math.random() * 10 + 5 + 'px';
+                confetti.style.animationDuration = Math.random() * 3 + 2 + 's';
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+
+        // Display current offers on welcome page
+        function displayCurrentOffers() {
+            offersContainer.innerHTML = '';
+            
+            let availableOffers = 0;
+            let minInterestRate = Infinity;
+            
+            for (const [months, rate] of Object.entries(currentSettings.rates)) {
+                if (!rate.available) continue;
+                
+                availableOffers++;
+                if (rate.interest < minInterestRate) {
+                    minInterestRate = rate.interest;
+                }
+                
+                const offerCard = document.createElement('div');
+                offerCard.className = 'offer-card bg-white p-6 rounded-lg relative';
+                
+                // Add badge for special offers (now on the left side)
+                if (rate.offerType !== "none") {
+                    let badgeClass = "";
+                    let badgeText = "";
+                    
+                    if (rate.offerType === "interest") {
+                        badgeClass = "interest-offer";
+                        badgeText = "خصم على الفوائد";
+                    } else if (rate.offerType === "fee") {
+                        badgeClass = "fee-offer";
+                        badgeText = "خصم على المصاريف";
+                    } else if (rate.offerType === "both") {
+                        badgeClass = "both-offer";
+                        badgeText = "خصم شامل";
+                    } else if (rate.offerType === "zero-fee") {
+                        badgeClass = "zero-fee-offer";
+                        badgeText = "بدون مصاريف";
+                    }
+                    
+                    offerCard.innerHTML = `<div class="offer-badge ${badgeClass}">${badgeText}</div>`;
+                }
+                
+                let offerDetails = "";
+                
+                if (rate.offerType === "interest") {
+                    offerDetails = `<p class="text-green-600 font-medium mt-2">خصم على الفوائد</p>`;
+                } else if (rate.offerType === "fee") {
+                    offerDetails = `<p class="text-green-600 font-medium mt-2">خصم خاص على المصاريف</p>`;
+                } else if (rate.offerType === "both") {
+                    offerDetails = `<p class="text-green-600 font-medium mt-2">خصم شامل على الفوائد والمصاريف</p>`;
+                } else if (rate.offerType === "zero-fee") {
+                    offerDetails = `<p class="text-green-600 font-medium mt-2">بدون مصاريف إدارية</p>`;
+                }
+                
+                offerCard.innerHTML += `
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">${months} شهر</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">نسبة الفائدة</span>
+                            <span class="font-medium ${rate.offerType === 'interest' || rate.offerType === 'both' ? 'text-red-500' : 'text-blue-600'}">${rate.interest}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">المصاريف الإدارية</span>
+                            <span class="font-medium ${rate.offerType === 'fee' || rate.offerType === 'both' || rate.offerType === 'zero-fee' ? 'text-green-500' : 'text-blue-600'}">${rate.offerType === 'zero-fee' ? '0%' : rate.fee + '%'}</span>
+                        </div>
+                        ${offerDetails}
+                        <button class="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg font-medium hover:bg-blue-100 transition" data-months="${months}">
+                            احسب التمويل
+                        </button>
+                    </div>
+                `;
+                
+                offersContainer.appendChild(offerCard);
+            }
+            
+            // Update offers count and min interest
+            currentOffersCount.textContent = availableOffers;
+            minInterest.textContent = minInterestRate !== Infinity ? minInterestRate + '%' : '0%';
+            
+            // Add event listeners to calculate buttons
+            document.querySelectorAll('[data-months]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const months = this.getAttribute('data-months');
+                    calculateInstallments();
+                    
+                    // Scroll to the specific installment card
+                    setTimeout(() => {
+                        const cards = document.querySelectorAll('.installment-card');
+                        if (cards.length > 0) {
+                            const targetCard = Array.from(cards).find(card => 
+                                card.querySelector('h3').textContent.includes(months + ' شهر')
+                            );
+                            
+                            if (targetCard) {
+                                targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                targetCard.classList.add('ring-2', 'ring-blue-500');
+                                
+                                setTimeout(() => {
+                                    targetCard.classList.remove('ring-2', 'ring-blue-500');
+                                }, 3000);
+                            }
+                        }
+                    }, 100);
+                });
+            });
+        }
+
+        // Navigation functions
+        function goBackToWelcome() {
+            resultsPage.classList.add('hidden');
+            welcomePage.classList.remove('hidden');
+        }
+
+        function showAdminPage() {
+            welcomePage.classList.add('hidden');
+            resultsPage.classList.add('hidden');
+            adminPage.classList.remove('hidden');
+            loginForm.classList.remove('hidden');
+            adminDashboard.classList.add('hidden');
+            
+            // Clear login form
+            adminUsername.value = '';
+            adminPassword.value = '';
+            loginError.classList.add('hidden');
+        }
+
+        function logout() {
+            loginForm.classList.remove('hidden');
+            adminDashboard.classList.add('hidden');
+            // Return to welcome page
+            adminPage.classList.add('hidden');
+            welcomePage.classList.remove('hidden');
+        }
+
+        // Admin functions
+        function login() {
+            const username = adminUsername.value;
+            const password = adminPassword.value;
+            
+            if (username === adminCredentials.username && 
+                password === adminCredentials.password) {
+                loginForm.classList.add('hidden');
+                adminDashboard.classList.remove('hidden');
+                
+                // Update admin form with current settings
+                updateRatesTable();
+                
+                // Update credentials form
+                newUsername.value = adminCredentials.username;
+                adminEmail.value = adminCredentials.email;
+            } else {
+                loginError.classList.remove('hidden');
+            }
+        }
+
+        // Update rates table in admin dashboard
+        function updateRatesTable() {
+            ratesTableBody.innerHTML = '';
+            
+            for (const [months, rate] of Object.entries(currentSettings.rates)) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${months}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="number" step="0.1" value="${rate.interest}"
+                                class="interest-input w-full px-2 py-1 border border-gray-300 rounded"
+                                data-months="${months}">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="number" step="0.1" value="${rate.fee}"
+                                class="fee-input w-full px-2 py-1 border border-gray-300 rounded"
+                                data-months="${months}">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="checkbox" ${rate.available ? 'checked' : ''}
+                                class="available-input h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                data-months="${months}">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <select class="offer-type-input w-full px-2 py-1 border border-gray-300 rounded" data-months="${months}">
+                            <option value="none" ${rate.offerType === "none" ? "selected" : ""}>بدون عرض</option>
+                            <option value="interest" ${rate.offerType === "interest" ? "selected" : ""}>خصم على الفوائد</option>
+                            <option value="fee" ${rate.offerType === "fee" ? "selected" : ""}>خصم على المصاريف</option>
+                            <option value="both" ${rate.offerType === "both" ? "selected" : ""}>خصم شامل</option>
+                            <option value="zero-fee" ${rate.offerType === "zero-fee" ? "selected" : ""}>بدون مصاريف إدارية</option>
+                        </select>
+                    </td>
+                `;
+                ratesTableBody.appendChild(row);
+            }
+        }
+
+        // Update saveSettings function to use real Firebase
+        async function saveSettings() {
+            // Get all updated rates from the table
+            const updatedRates = {};
+            
+            document.querySelectorAll('.interest-input').forEach(input => {
+                const months = input.dataset.months;
+                updatedRates[months] = {
+                    interest: parseFloat(input.value),
+                    fee: parseFloat(document.querySelector(`.fee-input[data-months="${months}"]`).value),
+                    available: document.querySelector(`.available-input[data-months="${months}"]`).checked,
+                    offerType: document.querySelector(`.offer-type-input[data-months="${months}"]`).value
+                };
+            });
+            
+            // Show loading
+            saveSettingsBtn.disabled = true;
+            saveSettingsBtn.innerHTML = '<div class="loading-spinner"></div> جاري الحفظ...';
+            
+            try {
+                // Update settings
+                currentSettings = {
+                    rates: updatedRates,
+                    lastUpdated: new Date().toLocaleString()
+                };
+                
+                // Save to Firebase
+                await database.ref('settings').set(currentSettings);
+                
+                // Update displays
+                updateAdminDashboard();
+                displayCurrentOffers();
+                
+                showToast("تم حفظ الإعدادات بنجاح");
+            } catch (error) {
+                console.error("Error saving settings:", error);
+                showToast("حدث خطأ أثناء حفظ الإعدادات");
+            } finally {
+                // Reset button
+                saveSettingsBtn.disabled = false;
+                saveSettingsBtn.textContent = 'حفظ الإعدادات';
+            }
+        }
+
+        // Update updateCredentials function to use real Firebase
+        async function updateCredentials() {
+            const username = newUsername.value.trim();
+            const password = newPassword.value;
+            const confirm = confirmPassword.value;
+            const email = adminEmail.value.trim();
+            
+            if (!username || !password || !confirm || !email) {
+                alert("الرجاء ملء جميع الحقول");
+                return;
+            }
+            
+            if (password !== confirm) {
+                alert("كلمة المرور وتأكيدها غير متطابقين");
+                return;
+            }
+            
+            if (!validateEmail(email) && email !== "") {
+                alert("الرجاء إدخال بريد إلكتروني صحيح");
+                return;
+            }
+            
+            // Show loading
+            updateCredentialsBtn.disabled = true;
+            updateCredentialsBtn.innerHTML = '<div class="loading-spinner"></div> جاري التحديث...';
+            
+            try {
+                // Update credentials
+                adminCredentials = {
+                    username: username,
+                    password: password,
+                    email: email
+                };
+                
+                // Save to Firebase
+                await database.ref('credentials').set(adminCredentials);
+                
+                showToast("تم تحديث بيانات الدخول بنجاح");
+            } catch (error) {
+                console.error("Error updating credentials:", error);
+                showToast("حدث خطأ أثناء تحديث بيانات الدخول");
+            } finally {
+                // Reset button
+                updateCredentialsBtn.disabled = false;
+                updateCredentialsBtn.innerHTML = '<i class="fas fa-user-edit ml-2"></i>تحديث بيانات الدخول';
+            }
+        }
+
+        function updateAdminDashboard() {
+            // Count available offers
+            let availableCount = 0;
+            for (const rate of Object.values(currentSettings.rates)) {
+                if (rate.available) availableCount++;
+            }
+            
+            // Find minimum interest rate
+            let minRate = Infinity;
+            for (const rate of Object.values(currentSettings.rates)) {
+                if (rate.available && rate.interest < minRate) {
+                    minRate = rate.interest;
+                }
+            }
+            
+            currentOffersCount.textContent = availableCount;
+            minInterest.textContent = minRate !== Infinity ? minRate + '%' : '0%';
+            lastUpdated.textContent = currentSettings.lastUpdated;
+        }
+        
+        // Apply for loan
+        function applyForLoan() {
+            showToast("تم إرسال طلب التمويل بنجاح، سيتم التواصل معك قريبًا");
+            
+            // Simulate updating statistics
+            const total = parseInt(totalApplications.textContent.replace(/,/g, '')) + 1;
+            const approved = parseInt(approvedApplications.textContent.replace(/,/g, ''));
+            const pending = parseInt(pendingApplications.textContent.replace(/,/g, '')) + 1;
+            const rejected = parseInt(rejectedApplications.textContent.replace(/,/g, ''));
+            
+            totalApplications.textContent = total.toLocaleString();
+            pendingApplications.textContent = pending.toLocaleString();
+            
+            // After 3 seconds, simulate approval
+            setTimeout(() => {
+                approvedApplications.textContent = (approved + 1).toLocaleString();
+                pendingApplications.textContent = (pending - 1).toLocaleString();
+            }, 3000);
+        }
+
+        // Utility functions
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = input.nextElementSibling.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+        
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
