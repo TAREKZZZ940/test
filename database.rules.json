@@ -1,0 +1,12 @@
+{
+  "rules": {
+    "settings": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "credentials": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}
